@@ -1,98 +1,72 @@
 library(shiny)
-library(shinydashboard)
 library(shinythemes)
 
-ui <- fluidPage(
-    dashboardPage(
-      dashboardHeader(title = "Elaboración y descripción de un modelo predictivo para partidos de fútbol soccer"),
-      dashboardSidebar(
-        sidebarMenu(
-          menuItem("Rendimiento del equipo", tabName = "bar_graph", icon = icon("dashboard")),
-          menuItem("Probabilidades de goles e casa", tabName = "phs_aws", icon = icon("area-chart")),
-          menuItem("Partidos", tabName = "data_table", icon = icon("table")),
-          menuItem("Ganancias promedio y máximo", tabName = "img", icon = icon("file-picture-o"))
-        )
-      ),
-      dashboardBody(
-        tabItems(
-          tabItem(tabName = "bar_graph",
-                  fluidRow(
-                    titlePanel("Gráfico de barras para el equipo local"), 
-                    selectInput("x", "Seleccione el equipo local",
-                                choices = names(mtcars)),
-                    box(plotOutput("plot1", height = 250)),
-                    box(
-                      title = "Controls",
-                      sliderInput("bins", "Number of observations:", 1, 30, 15)
-                    )
-                  )
-          ),
-          
-          
-          tabItem(tabName = "graph", 
-                  fluidRow(
-                    titlePanel(h3("Gráficos de dispersión")),
-                    selectInput("a", "Selecciona el valor de x",
-                                choices = names(mtcars)),
-                    selectInput("y", "Seleccione el valor de y",
-                                choices = names(mtcars)),
-                    selectInput("z", "Selecciona la variable del grid", 
-                                choices = c("cyl", "vs", "gear", "carb")),
-                    box(plotOutput("output_plot", height = 300, width = 460) )
-                  )
-          ),
-          tabItem(tabName = "data_table",
-                  fluidRow(        
-                    titlePanel(h3("Data Table")),
-                    dataTableOutput ("data_table")
-                  )
-          ), 
-          tabItem(tabName = "img",
-                  fluidRow(
-                    titlePanel(h3("Imágen de calor para la correlación de las variables")),
-                    img(src = "cor_mtcars.png", 
-                        height = 350, width = 350)
-                  )
-          )
-          
-        )
-      )
-    )
-  )
+#Cargamos los datos necesarios
+md <- read.csv("match.data.csv")
 
+ui <- navbarPage(theme = shinytheme("superhero"),
+                 title = "Elaboración y descripción de un modelo predictivo para partidos de fútbol soccer",
+                 tabPanel("Rendimiento del equipo", 
+                          sidebarLayout(sidebarPanel(
+                            selectInput(inputId = "teamChoice",
+                                        label = "Selecciona el equipo local",
+                                        choices = sort(unique(md$Home.team))
+                            )
+                          ),
+                          mainPanel(
+                            plotOutput("bar_LocalTeam", width = "100%")
+                          )
+                          )
+                 ), 
+                 tabPanel("Probabilidades de goles en casa", 
+                          fluidRow(column(width = 4),
+                                   column(width = 6, offset =2,
+                                          wellPanel(img(src='MarginalProbabilities.png', height="30%", width="100%", align = "center")))),
+                          fluidRow(column(width = 4),
+                                   column(width = 6, offset =2,
+                                          wellPanel(img(src='jointProbabilities.png', height="30%", width="100%", align = "center"))))
+                          ), 
+                 tabPanel("Partidos", "contents",
+                          dataTableOutput ("data_table")),
+                 tabPanel("Ganancias promedio y máximo", 
+                          fluidRow(column(width = 4),
+                                   column(width = 6, offset = 2,
+                                          wellPanel(img(src='CuotaMaxima.png', height="20%", width="100%", align = "center")))),
+                          fluidRow(column(width = 4),
+                                   column(width = 6, offset = 2,
+                                          wellPanel(img(src='CuotaPromedio.png', height="20%", width="100%", align = "center"))))
+                          ))
 
 
 server <- function(input, output) {
-  library(ggplot2)
-  output$plot1 <- renderPlot({
-    x <- mtcars[,input$x]
-    bin <- seq(min(x), max(x), length.out = input$bins + 1)
-    ggplot(mtcars, aes(x, fill = mtcars[,input$zz])) + 
-      geom_histogram( breaks = bin) +
-      labs( xlim = c(0, max(x))) + 
-      theme_light() + 
-      xlab(input$x) + ylab("Frecuencia") + 
-      facet_grid(input$zz)
-  })
+  output$bar_LocalTeam <- renderPlot({
+    md %>% filter(Home.team == input$teamChoice) %>%
+      pivot_longer(cols = c(Home.score, Away.score), 
+                   names_to = "home_away", values_to = "Goles") %>% 
+      mutate(home_away = factor(home_away, levels = c("Home.score", "Away.score"), 
+                                labels = c("Local", "Visitante"))) %>% 
+      ggplot(aes(x = home_away, y = Goles, fill = home_away)) + 
+      facet_wrap("Away.team") + 
+      geom_bar(stat = "identity") + 
+      labs(x = NULL, title = paste(c("Número de goles del equipo ", input$teamChoice, " como local y del equipo visitante"), collapse = "")) + 
+      scale_fill_manual(values = c("#FC471F", "black")) + 
+      theme(plot.title = element_text(size=12, hjust = 0.5, face = "bold"),
+            axis.text.x = element_blank(),
+            axis.text.y = element_text(face = "bold", size = 10, colour = "black"),
+            axis.text = element_text(colour = "gray82", face = "bold"),
+            axis.title = element_text(face = "bold"),
+            axis.ticks.x = element_blank(),
+            panel.grid.major = element_line(colour = "gray97"), 
+            panel.grid.minor = element_line(colour = "gray85"),
+            panel.background = element_rect(fill = "gray97", linetype = "solid"), 
+            plot.background = element_rect(colour = "aliceblue")) + 
+      guides(fill = guide_legend(title="Goles del \nequipo ..."))
+  }, height = 500)
   
-  
-  output$output_plot <- renderPlot({ 
-    ggplot(mtcars, aes(x =  mtcars[,input$a] , y = mtcars[,input$y], 
-                       colour = mtcars[,input$z] )) + 
-      geom_point() +
-      ylab(input$y) +
-      xlab(input$a) + 
-      theme_linedraw() + 
-      facet_grid(input$z)
-    
-  })   
-  
-  
-  output$data_table <- renderDataTable( {mtcars}, 
-                                        options = list(aLengthMenu = c(5,25,50),
-                                                       iDisplayLength = 5)
-  )
-  
+  output$data_table <- renderDataTable({md}, 
+                                       options = list(aLengthMenu = c(5,25,50),
+                                                       iDisplayLength = 10)
+                                       )
 }
 
 shinyApp(ui, server)

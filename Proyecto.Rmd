@@ -1,13 +1,14 @@
 
 ```{r setup, include=FALSE}
 knitr::opts_chunk$set(echo = TRUE)
+library(tidyverse)
 library(fbRanks)
 library(dplyr)
 library(ggplot2)
 library(igraph)
 ```
 
-```{r}
+```{r, eval=FALSE}
 setwd(getwd())
 # Descarga de archivos
 # https://www.football-data.co.uk/spainm.php
@@ -36,8 +37,10 @@ download.file(url = u1819, destfile ="RawData/SP1-1819.csv", mode = "wb")
 ```
 
 ```{r}
-setwd(getwd())
+setwd(dirname(rstudioapi::getSourceEditorContext()$path))
 lista_datos <- lapply(paste("RawData/", list.files(path = "RawData"), sep = ""), read.csv)
+#Así evitamos tomar los datos que se trataran de manera independiente.
+if(length(lista_datos) == 10) lista_datos[[10]] <- NULL
 ```
 
 ```{r}
@@ -316,21 +319,27 @@ for(j in 1:length(phs)){
   }
 }
 
+#Unificamos un theme para nuestras gráficas.
+theme_equipo11 <- theme(plot.title = element_text(size=12, hjust = 0.5, face = "bold"),
+        axis.text.x = element_text(face = "bold", size = 10, colour = "black"),
+        axis.text.y = element_text(face = "bold", size = 10, colour = "black"),
+        axis.text = element_text(colour = "gray82", face = "bold"),
+        axis.title = element_text(face = "bold"),
+        panel.grid.major = element_line(colour = "gray97"), 
+        panel.grid.minor = element_line(colour = "gray85"),
+        panel.background = element_rect(fill = "gray97", linetype = "solid"), 
+        plot.background = element_rect(colour = "aliceblue"))
+
 # Escenario con momios máximos
 g <- data.frame(Num_Ap = 1:length(g), Capital = g)
-p <- ggplot(g, aes(x=Num_Ap, y=Capital)) + geom_line( color="#FC471F") + geom_point() +
+p <- ggplot(g, aes(x=Num_Ap, y=Capital)) + geom_line( color="#FC471F") +
+  geom_point(size =.5) +
   labs(x = "Número de juego", 
        y = "Capital",
        title = "Realizando una secuencia de juegos") +
-  theme(plot.title = element_text(size=12, hjust = 0.5, face = "bold"),
-        axis.text.x = element_text(face = "bold", size = 10, colour = "black"),
-        axis.text.y = element_text(face = "bold", size = 10, colour = "black"),
-        panel.grid.major = element_line(colour = "gray77"), 
-        panel.grid.minor = element_line(colour = "gray97"), 
-        axis.text = element_text(colour = "gray82"), 
-        panel.background = element_rect(fill = "gray97", linetype = "solid"), 
-        plot.background = element_rect(colour = "aliceblue"))   
+     theme_equipo11
 p
+ggsave(plot = p, filename = "CuotaMáxima.png", device = png, height = 3)
 ```
 
 ```{r}
@@ -353,38 +362,35 @@ for(j in 1:length(phs)){
 
 g <- data.frame(Num_Ap = 1:length(g), Capital = g)
 p <- ggplot(g, aes(x=Num_Ap, y=Capital)) + geom_line( color="#FC471F") + 
-  geom_point(size =.7) +
+  geom_point(size =.5) +
   labs(x = "Número de juego", 
        y = "Capital",
        title = "Realizando una secuencia de juegos") +
-  theme(plot.title = element_text(size=12, hjust = 0.5, face = "bold"),
-        axis.text.x = element_text(face = "bold", size = 10, colour = "black"),
-        axis.text.y = element_text(face = "bold", size = 10, colour = "black"),
-        panel.grid.major = element_line(colour = "gray77"), 
-        panel.grid.minor = element_line(colour = "gray97"), 
-        axis.text = element_text(colour = "gray82"), 
-        panel.background = element_rect(fill = "gray97", linetype = "solid"), 
-        plot.background = element_rect(colour = "aliceblue"))  
+  theme_equipo11
 p
+ggsave(plot = p, filename = "CuotaPromedio.png", device = png, height = 3)
 ```
  
 ```{r}
-local <- "Barcelona"
-scores %>% filter(home.team == local) %>% 
-  ggplot(aes(x = factor(c(sum(home.score), sum(away.score))))) + 
-  facet_wrap("away.team") + 
-  geom_bar()
+local <- "Leganes"
+
+md %>% filter(Home.team == local) %>%
+  pivot_longer(cols = c(Home.score, Away.score), 
+               names_to = "home_away", values_to = "Goles") %>% 
+  mutate(home_away = factor(home_away, levels = c("Home.score", "Away.score"), 
+                        labels = c("Local", "Visitante"))) %>% 
+  ggplot(aes(x = home_away, y = Goles, fill = home_away)) + 
+  facet_wrap("Away.team") + 
+  geom_bar(stat = "identity") + 
+  labs(x = NULL, title = paste(c("Número de goles del equipo ", local, " como local y del equipo visitante"), collapse = "")) + 
+  scale_fill_manual(values = c("#FC471F", "black")) + 
+  theme_equipo11 +
+  theme(axis.text.x = element_blank(), axis.ticks.x = element_blank()) +
+  guides(fill = guide_legend(title="Goles del \nequipo ..."))
+
 ```
 
 ```{r}
-local <- "Barcelona"
-scores %>% filter(home.team == local) %>% 
-  ggplot(aes(x = home.score)) + 
-  facet_wrap("away.team") + 
-  geom_bar()
-```
-
-```{r}
-scores
+md %>% filter(Home.team == local) %>% arrange(Away.team)
 ```
 
