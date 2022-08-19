@@ -284,12 +284,6 @@ mean( hs + as < 2.5 & phs + pas < 2.1)/mean(phs + pas < 2.1)
 # De manera similar, la probabilidad de obtener menos de 2.5 goles en el partido, dado que el modelo me dijo que sucederían menos de 2.1, es de 0.5891182
 ```
 
-
-```{r}
-data
-```
-
-
 ```{r}
 # Juegos con momios máximos (es decir, apuestas sobre el número de goles)
 #cap: capital inicial
@@ -300,7 +294,7 @@ for(j in 1:length(phs)){
   #Hacemos dos apuestas sobre los juegos donde se predijeron más de 3 goles o menos de 2.1 goles. 0.64/(momio$Max.2.5.O[j]^-1) > 1 y 0.58/(momio$Max.2.5.U[j]^-1) > 1 nos ayudan a filtrar los partidos en los que las cuotas nos permitan obtener una ganancia mínima. 
 
   #Primera apuesta:
-  #Si se predijeron más de 3 goles por partido y el 64% de la cuota máxima es mayor a 1 entonces apostamos:
+  #Si se predijeron más de 3 goles por partido y la probabilidad de obtener más de 2.5 goles condicionado a que nuestro modelo prediga más de 3 goles se mayor que la establecida por el sitio de apuestas ((momio$Max.2.5.O[j]^-1)):
   if(((phs[j] + pas[j]) > 3) & (0.64/(momio$Max.2.5.O[j]^-1) > 1)){
     #Checamos que se hayan obtenido más de 2.5 goles, en todo caso ganamos ...
     if((hs[j] + as[j]) > 2.5) cap <- cap + 1000*(momio$Max.2.5.O[j]-1)
@@ -309,7 +303,7 @@ for(j in 1:length(phs)){
     g <- c(g, cap)
   }
   #Segunda apuesta:
-  #Si se predijeron menos de 2.1 goles por partido y el 58% de la cuota máxima es mayor a 1 entonces apostamos:
+  #Si se predijeron menos de 2.1 goles por partido y la probabilidad de obtener menos de 2.5 goles condicionado a que nuestro modelo prediga menos de 2.1 goles se mayor que la establecida por el sitio de apuestas ((momio$Max.2.5.O[j]^-1)):
   if(((phs[j] + pas[j]) < 2.1) & (0.58/(momio$Max.2.5.U[j]^-1) > 1)){
     #Checamos que se hayan obtenido meos de 2.5 goles, en todo caso ganamos ...
     if((hs[j] + as[j]) < 2.5) cap <- cap + 1000*(momio$Max.2.5.U[j]-1)
@@ -370,27 +364,11 @@ p <- ggplot(g, aes(x=Num_Ap, y=Capital)) + geom_line( color="#FC471F") +
 p
 ggsave(plot = p, filename = "CuotaPromedio.png", device = png, height = 3)
 ```
- 
-```{r}
-local <- "Leganes"
 
-md %>% filter(Home.team == local) %>%
-  pivot_longer(cols = c(Home.score, Away.score), 
-               names_to = "home_away", values_to = "Goles") %>% 
-  mutate(home_away = factor(home_away, levels = c("Home.score", "Away.score"), 
-                        labels = c("Local", "Visitante"))) %>% 
-  ggplot(aes(x = home_away, y = Goles, fill = home_away)) + 
-  facet_wrap("Away.team") + 
-  geom_bar(stat = "identity") + 
-  labs(x = NULL, title = paste(c("Número de goles del equipo ", local, " como local y del equipo visitante"), collapse = "")) + 
-  scale_fill_manual(values = c("#FC471F", "black")) + 
-  theme_equipo11 +
-  theme(axis.text.x = element_blank(), axis.ticks.x = element_blank()) +
-  guides(fill = guide_legend(title="Goles del \nequipo ..."))
 
-```
+Agregar lo del postwork 3 (las gráficas)
 
 ```{r}
-md %>% filter(Home.team == local) %>% arrange(Away.team)
+t.test(SP1_Spain$FTHG, SP1_Spain$FTAG, alternative = "greater")
 ```
 
