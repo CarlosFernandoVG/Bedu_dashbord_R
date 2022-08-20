@@ -294,9 +294,11 @@ for(j in 1:length(phs)){
   #Hacemos dos apuestas sobre los juegos donde se predijeron más de 3 goles o menos de 2.1 goles. 0.64/(momio$Max.2.5.O[j]^-1) > 1 y 0.58/(momio$Max.2.5.U[j]^-1) > 1 nos ayudan a filtrar los partidos en los que las cuotas nos permitan obtener una ganancia mínima. 
 
   #Primera apuesta:
-  #Si se predijeron más de 3 goles por partido y la probabilidad de obtener más de 2.5 goles condicionado a que nuestro modelo prediga más de 3 goles se mayor que la establecida por el sitio de apuestas ((momio$Max.2.5.O[j]^-1)):
+  #Si se predijeron más de 3 goles por partido y la probabilidad de obtener más de 2.5 goles condicionado a que nuestro modelo prediga más de 3 goles se mayor que la establecida por el sitio de apuestas ((momio$Max.2.5.O[j]^-1)).
+  #La estrategia de apuesta propuesta por el modelo Dixon y Coles sugiere que se apueste cuando la probabilidad del modelo entre la probabilidad derivada de los momios (dados por la casa de apuestas) sea mayor a r (en este caso 1)
+  
   if(((phs[j] + pas[j]) > 3) & (0.64/(momio$Max.2.5.O[j]^-1) > 1)){
-    #Checamos que se hayan obtenido más de 2.5 goles, en todo caso ganamos ...
+    #Checamos que se hayan obtenido más de 2.5 goles, en todo caso ganamos nuestra inversión (1000) por el momio que establace la casa de apuesta - 1 (la forma en que se paga al ganar la apuesta)
     if((hs[j] + as[j]) > 2.5) cap <- cap + 1000*(momio$Max.2.5.O[j]-1)
     #Si no se obtuvieron esos goles, perdemos 1000 unidades monetarias.
     else cap <- cap - 1000
@@ -325,8 +327,8 @@ theme_equipo11 <- theme(plot.title = element_text(size=12, hjust = 0.5, face = "
         plot.background = element_rect(colour = "aliceblue"))
 
 # Escenario con momios máximos
-g <- data.frame(Num_Ap = 1:length(g), Capital = g)
-p <- ggplot(g, aes(x=Num_Ap, y=Capital)) + geom_line( color="#FC471F") +
+g_max <- data.frame(Num_Ap = 1:length(g), Capital = g)
+p <- ggplot(g_max, aes(x=Num_Ap, y=Capital)) + geom_line( color="#FC471F") +
   geom_point(size =.5) +
   labs(x = "Número de juego", 
        y = "Capital",
@@ -354,8 +356,8 @@ for(j in 1:length(phs)){
   }
 }
 
-g <- data.frame(Num_Ap = 1:length(g), Capital = g)
-p <- ggplot(g, aes(x=Num_Ap, y=Capital)) + geom_line( color="#FC471F") + 
+g_ave <- data.frame(Num_Ap = 1:length(g), Capital = g)
+p <- ggplot(g_ave, aes(x=Num_Ap, y=Capital)) + geom_line( color="#FC471F") + 
   geom_point(size =.5) +
   labs(x = "Número de juego", 
        y = "Capital",
@@ -365,10 +367,79 @@ p
 ggsave(plot = p, filename = "CuotaPromedio.png", device = png, height = 3)
 ```
 
+*** 
 
-Agregar lo del postwork 3 (las gráficas)
+Para contestar algunas preguntas sobre el comportamiento de goles, necesitamos tomar lo necesario del postwork 2:
 
 ```{r}
-t.test(SP1_Spain$FTHG, SP1_Spain$FTAG, alternative = "greater")
+SP1_2017_2018 <- read.csv("https://www.football-data.co.uk/mmz4281/1718/SP1.csv")
+SP1_2018_2019 <- read.csv("https://www.football-data.co.uk/mmz4281/1819/SP1.csv")
+SP1_2019_2020 <- read.csv("https://www.football-data.co.uk/mmz4281/1920/SP1.csv")
+
+SP1_Spain <- list(SP1_2017_2018, SP1_2018_2019, SP1_2019_2020)
+SP1_Spain <- lapply(SP1_Spain, dplyr::select, Date, HomeTeam, AwayTeam, FTHG, FTAG, FTR)
+SP1_Spain <- lapply(SP1_Spain, mutate, Date = as.Date(Date))
+SP1_Spain <- do.call(rbind, SP1_Spain)
 ```
+
++ **¿Cuáles son las probabilidades de que el equipo local gane, pierda o empate?**
+
+Tenemos la siguiente distribución conjunta del número de goles por el equipo local (los renglones) y por el equipo visitante (columnas)
+
+```{r}
+(joint_dist_goles <- prop.table(table(SP1_Spain$FTHG, SP1_Spain$FTAG)))
+```
+
+Sucede empate cuando #Goles del equipo visitante = #Goles del equipo local. La probabilidad de que esto suceda (de manera empírica) es del 26.4%
+
+```{r}
+diag(joint_dist_goles) %>% sum()
+#[1] 0.2640351
+```
+
+El equipo local gana cuando #Goles del equipo visitante < #Goles del equipo local. La probabilidad de que esto suceda (de manera empírica) es del 46%
+
+```{r}
+joint_dist_goles[lower.tri(joint_dist_goles)] %>% sum()
+#[1] 0.4570175
+```
+
+El equipo visitante gana cuando #Goles del equipo visitante > #Goles del equipo local. La probabilidad de que esto suceda (de manera empírica) es del 46%
+
+```{r}
+joint_dist_goles[upper.tri(joint_dist_goles)] %>% sum()
+#[1] 0.2789474
+```
+
+Entonces, es más probable que el equipo local gane el partido y se obtienen probabilidades similares de que el equipo visitante gane o que se empate el partido.
+
++ **Estadísticamente hablando ¿El equipo local anota más goles que el equipo visitante?**
+
+Queremos probar la siguiente prueba de hipótesis: $H_{0}$: Número de goles en casa < Número de goles como visitante $vs$ $H_{a}$: Número de goles en casa > Número de goles como visitante.
+
+Realizamos la prueba de hipótesis (una prueba de medias):
+
+```{r}
+t.test(SP1_Spain$FTHG, SP1_Spain$FTAG, alternative = "greater", conf.level = 0.01)
+```
+
+Los resultados muestran que tenemos evidencia estadística para rechazar la hipótesis nula a un $1-\alpha$ = 99% (nivel de confianza), por lo que podemos decir que el número de goles promedio del equipo local es mayor que el del equipo visitante.
+
+***
+
+Realizamos un análisis de series de tiempo con nuestros resultados 
+
+```{r}
+series_max_capital <- ts(g_max$Capital)
+series_ave_capital <- ts(g_ave$Capital)
+```
+
+```{r}
+series_max_capital_D <- stats::decompose(series_max_capital, type = "additive")
+```
+
+```{r}
+series_max_capital
+```
+
 
