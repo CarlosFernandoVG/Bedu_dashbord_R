@@ -1,3 +1,11 @@
+---
+title: "Proyecto final: Estadística y programación con R. BEDU-Santander."
+author: "Gustavo Corona Ojeda"
+| "Gustavo Corona Ojeda"
+| "Vásquez Guerra Carlos Fernando"
+date: "8/2022"
+output: html_document
+---
 
 ```{r setup, include=FALSE}
 knitr::opts_chunk$set(echo = TRUE)
@@ -21,7 +29,7 @@ u1516 <- "https://www.football-data.co.uk/mmz4281/1516/SP1.csv"
 u1617 <- "https://www.football-data.co.uk/mmz4281/1617/SP1.csv"
 u1718 <- "https://www.football-data.co.uk/mmz4281/1718/SP1.csv"
 u1819 <- "https://www.football-data.co.uk/mmz4281/1819/SP1.csv"
-#Notamos que el último data set tiene unn tratamiento distinto. Optamoms por tratarlo de maera indepediente.
+#Notamos que el último data set tiene un tratamiento distinto. Optamos por tratarlo de manera independiente.
 #u1920 <- "https://www.football-data.co.uk/mmz4281/1920/SP1.csv"
 
 download.file(url = u1011, destfile ="RawData/SP1-1011.csv", mode = "wb")
@@ -332,8 +340,9 @@ p <- ggplot(g_max, aes(x=Num_Ap, y=Capital)) + geom_line( color="#FC471F") +
   geom_point(size =.5) +
   labs(x = "Número de juego", 
        y = "Capital",
-       title = "Realizando una secuencia de juegos") +
-     theme_equipo11
+       title = "Historial de ganancias y pérdidas con momios máximos") +
+     theme_equipo11 +
+  geom_smooth(method=lm, se=FALSE, col='#FC471F')
 p
 ggsave(plot = p, filename = "CuotaMáxima.png", device = png, height = 3)
 ```
@@ -357,12 +366,13 @@ for(j in 1:length(phs)){
 }
 
 g_ave <- data.frame(Num_Ap = 1:length(g), Capital = g)
-p <- ggplot(g_ave, aes(x=Num_Ap, y=Capital)) + geom_line( color="#FC471F") + 
+p <- ggplot(g_ave, aes(x=Num_Ap, y=Capital)) + geom_line(color="#FC471F") + 
   geom_point(size =.5) +
   labs(x = "Número de juego", 
        y = "Capital",
-       title = "Realizando una secuencia de juegos") +
-  theme_equipo11
+       title = "Historial de ganancias y pérdidas con momios promedio") +
+  theme_equipo11 + 
+  geom_smooth(method=lm, se=FALSE, col='#FC471F')
 p
 ggsave(plot = p, filename = "CuotaPromedio.png", device = png, height = 3)
 ```
@@ -382,7 +392,7 @@ SP1_Spain <- lapply(SP1_Spain, mutate, Date = as.Date(Date))
 SP1_Spain <- do.call(rbind, SP1_Spain)
 ```
 
-+ **¿Cuáles son las probabilidades de que el equipo local gane, pierda o empate?**
++ **¿Cuáles son las probabilidades de que el equipo local gane, pierda o empate entre 2018 y 2020?**
 
 Tenemos la siguiente distribución conjunta del número de goles por el equipo local (los renglones) y por el equipo visitante (columnas)
 
@@ -413,7 +423,29 @@ joint_dist_goles[upper.tri(joint_dist_goles)] %>% sum()
 
 Entonces, es más probable que el equipo local gane el partido y se obtienen probabilidades similares de que el equipo visitante gane o que se empate el partido.
 
-+ **Estadísticamente hablando ¿El equipo local anota más goles que el equipo visitante?**
+**¿Cuál equipo ha anota más goles en todo el historial?**
+
+```{r}
+scores %>% group_by(home.team) %>% summarise(goles = sum(home.score)) %>% 
+  rename(Equipo = home.team) %>% bind_rows(
+  scores %>% group_by(away.team) %>% summarise(goles = sum(away.score)) %>% 
+    rename(Equipo = away.team)
+) %>% 
+  group_by(Equipo) %>% summarise(goles_totales = sum(goles)) %>% arrange(desc(goles_totales))
+```
+Barcelona ha anotado 1037 goles
+
++ **¿Cuál es la probabilidad de que, en un juego que participa Barcelona, Barcelona gane el partido?**
+
+```{r}
+(scores %>% filter(home.team == "Barcelona" | away.team == "Barcelona") %>% 
+  mutate(Ganador = if_else(home.score > away.score, as.character(home.team), 
+                           if_else(home.score == away.score, "Empate", as.character(away.team)))) %>% mutate(Ganador = factor(Ganador)))$Ganador %>% table() %>% prop.table() %>% sort(decreasing = T)
+```
+
+Como podemos apreciar, el 75% de los partidos que ha jugado Barcelona, este ha sido ganador. El siguiente evento donde este involucrado Barcelona, es que el juego termine en empate.
+
++ **Estadísticamente hablando ¿El equipo local anota más goles que el equipo visitante (entre 2018 y 2020)?**
 
 Queremos probar la siguiente prueba de hipótesis: $H_{0}$: Número de goles en casa < Número de goles como visitante $vs$ $H_{a}$: Número de goles en casa > Número de goles como visitante.
 
@@ -423,6 +455,13 @@ Realizamos la prueba de hipótesis (una prueba de medias):
 t.test(SP1_Spain$FTHG, SP1_Spain$FTAG, alternative = "greater", conf.level = 0.01)
 ```
 
+Los resultados muestran que tenemos evidencia estadística para rechazar la hipótesis nula a un $1-\alpha$ = 99% (nivel de confianza), por lo que podemos decir que el número de goles promedio del equipo local es mayor que el del equipo visitante entre 2018 y 2020.
+
++ **Estadísticamente hablando ¿El equipo local anota más goles que el equipo visitante (considerando toda la información)?**
+
+```{r}
+t.test(scores$home.score, scores$away.score, alternative = "greater", conf.level = 0.01)
+```
 Los resultados muestran que tenemos evidencia estadística para rechazar la hipótesis nula a un $1-\alpha$ = 99% (nivel de confianza), por lo que podemos decir que el número de goles promedio del equipo local es mayor que el del equipo visitante.
 
 ***
@@ -434,12 +473,76 @@ series_max_capital <- ts(g_max$Capital)
 series_ave_capital <- ts(g_ave$Capital)
 ```
 
+Podemos considerar como unidades de tiempo a cada partido en el que se ha apostado. El problema radica en que la definición de la frecuencia, ya que la estrategia de apuesta es la que determina cuando apostar.
+
 ```{r}
 series_max_capital_D <- stats::decompose(series_max_capital, type = "additive")
 ```
 
+Podemos ver las gráficas de autocorrelacción y autocorrelación parcial para ver otros comportamientos
+
 ```{r}
-series_max_capital
+library(forecast)
+library(patchwork)
+(ggAcf(series_max_capital) + theme_equipo11 + ggtitle("ACF: Apuestas con momios máximos")
+  ) + (ggPacf(series_max_capital) + theme_equipo11 + ggtitle("PACF: Apuestas con momios máximos"))
 ```
+
+La primera gráfica indica que la serie tiene alguna tendencia y por la segunda podemos inferir que solo el valor inmediato anterior esta correlacionado con el estudiado. Esto da fuertes indicios para indicar que el comportamiento de nuestra apuesta cambiará solo por el efecto anterior, tal como una caminata aleatoria. 
+
+Podemos ver la tendencia que tiene nuestras apuestas en este momento
+
+```{r}
+autoplot(series_max_capital) + labs(x = "Número de Partidos", y = "Capital") + 
+  ggtitle("Tendencia de las apuestas con momios máximos") + 
+  geom_smooth(method=lm, se=FALSE, col='#FC471F') + 
+  theme_equipo11
+```
+
+Por lo que la estrategia de apuestas sigue, en este momento, una tendencia a la alza.
+
+```{r}
+(ajuste_momios_maximos <- auto.arima(series_max_capital))
+```
+
+Mediante la función auto.arima, podemos ver que el modelo ARIMA que mejor se ajusta a nuestros datos es un modelo de medias móviles donde se considera solo 1 diferencia.
+
+```{r}
+ajuste_momios_maximos %>% forecast(h = 10) %>% autoplot() + 
+  ggtitle("Predicción de las apuestas con momios máximos") + 
+  geom_smooth(method=lm, se=FALSE, col='#FC471F') + 
+  theme_equipo11 + 
+  labs(x = "Número de juegos", y = "Capital")
+```
+
+El comportamiento que obtenemos considerando ahora los momios promedio, es bastante similar.
+
+```{r}
+(ggAcf(series_ave_capital) + theme_equipo11 + ggtitle("ACF: Apuestas con momios promedio")
+  ) + (ggPacf(series_ave_capital) + theme_equipo11 + ggtitle("PACF: Apuestas con momios promedio"))
+```
+Aunque, es clara una tendencia a la baja, considerando todos los juegos en los que se ha apostado.
+
+```{r}
+autoplot(series_ave_capital) + labs(x = "Número de Partidos", y = "Capital") + 
+  ggtitle("Tendencia de las apuestas con momios máximos") + 
+  geom_smooth(method=lm, se=FALSE, col='#FC471F') + 
+  theme_equipo11
+```
+
+```{r}
+(ajuste_momios_promedio <- auto.arima(series_ave_capital))
+```
+
+```{r}
+ajuste_momios_promedio %>% forecast(h = 10) %>% autoplot() + 
+  ggtitle("Predicción de las apuestas con momios promedio") + 
+  geom_smooth(method=lm, se=FALSE, col='#FC471F') + 
+  theme_equipo11 + 
+  labs(x = "Número de juegos", y = "Capital")
+```
+
+Considerando ambos análisis, al apostar contra los momios máximos, se tienen mayores oportunidades para obtener una mejor ganancia, esto en comparación de las apuestas contra los momios promedio. Se recomienda seguir la estrategia de apuestas que propone el modelo contra los momios máximos aunque, tomando en cuenta los resultados y las predicciones obtenidas por los modelos ARIMA, no se logra tener un buen comportamiento con estos modelos, por lo que es pertinente hacer evaluaciones continuas para ver si la tendencia de las apuestas cambia.
+
 
 
