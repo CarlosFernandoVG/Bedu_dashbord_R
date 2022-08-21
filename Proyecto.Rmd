@@ -72,7 +72,6 @@ d1920S <- mutate(d1920S, Date = as.Date(Date, format = "%d/%m/%Y"))
 d1019S <- do.call(rbind, lista_datos)
 
 #Renombramos las columnas
-#Las especificaciones de las notas indican que se hacen apuestas 1X2; es decir, se apuesta sobre el equipo ganador y sobre los goles totales (como en este caso) (https://www.oddsshark.com/es/apuestas-deportivas/tipos-de-apuestas/apuestas-1x2)
 
 #Las siguientes variables son para las cuotas de apuestas de goles totales:
 
@@ -162,14 +161,14 @@ head(test, n = 1); tail(test, n = 1)
 ```
 
 ```{r}
-# Primer ajuste del modelo
+#Primer ajuste del modelo
 #Para un mejor funcionamiento al entrenar y probar el primer modelo, tomamos las fechas de los encuentros únicos.
 traindate <- unique(train$date)
 testdate <- unique(test$date)
 
 #Hacemos el modelo (una regresión poisson) para predecir el resultado de los partidos entre dos equipos de acuerdo a sus fuerza de ataque y defensa.
 
-#Véase que al colocar scores = scores, estamos agregando toda la información que tenemos, es decir los partidos desde el año 2010 al 2020. Al asignar min.date y max.date, estamos limitado los datos que se van a considerar para entrenar la regresión poisson (en el predict) aunque seguimos teniendo guardados los partidos que sucedieron después del testdate.
+#Véase que al colocar scores = scores, estamos agregando toda la información que tenemos, es decir los partidos desde el año 2010 al 2020. Al asignar min.date y max.date, estamos limitando los datos que se van a considerar para entrenar la regresión poisson (en el predict) aunque seguimos teniendo guardados los partidos que sucedieron después del testdate.
 ranks <- rank.teams(scores = scores, teams = teams, 
                     min.date = traindate[1], 
                     max.date = traindate[length(traindate)])
@@ -200,33 +199,32 @@ scores %>% filter(date == testdate[1])
 ```
 
 ```{r}
-phs <- NULL; pas <- NULL; pht <- NULL; pat <- NULL
-#Véase que varias veces se tiene que calcular esta instrucción dentro del ciclo y podríamos solo calcularlo una vez y luego acceder a uno de sus elementos.
-unique_dates <- unique(scores$date)
-#Con length(unique_dates)-170) estamos haciendo 1066 iteraciones, y básicamente con cada iteración estamos creando conjuntos de entrenamiento de 170 fechas (empezando en 2010-08-28) para predecir los partidos de los siguientes días. Por ejemplo, primero se utilizan los partidos entre 2010-08-28 (unique_dates[1]) a 2012-03-04 (unique_dates[170]) para predecir los partidos del día 2012-03-05 (unique_dates[170+1]).
-for(i in 1:(length(unique_dates)-170)){
-  ranks <- rank.teams(scores = scores, teams = teams, 
-                      min.date = unique_dates[i], 
-                      max.date = unique_dates[i+170-1], 
-                      silent = TRUE,
-                      time.weight.eta = 0.0005)
-  #Véase que este objeto se va modificando varias veces, por lo que al ver pred en la consola, solo veremos el último ejecutado en este ciclo y no el ajuste de todas las iteraciones.
-  
-  #Véase que al final, se predice los resultados de la última fecha: 2020-07-19.
-  pred <- predict(ranks, date = unique_dates[i+170],
-                  silent = TRUE)
-  
-  #Ya que estamos prediciendo los partidos de 1 día, por cada iteración; phs, pas, pht y pat podrían no ser del mismo tamaño (el tamaño de cada vector es el mismo que el número de partidos por día).
-  phs <- c(phs, pred$scores$pred.home.score) # predicted home score
-  pas <- c(pas, pred$scores$pred.away.score) # predicted away score
-  pht <- c(pht, pred$scores$home.team) # home team in predictions
-  pat <- c(pat, pred$scores$away.team) # away team in predictions
-}
+# phs <- NULL; pas <- NULL; pht <- NULL; pat <- NULL
+# 
+# for(i in 1:(length(unique_dates)-170)){
+#   ranks <- rank.teams(scores = scores, teams = teams, 
+#                       min.date = unique_dates[i], 
+#                       max.date = unique_dates[i+170-1], 
+#                       silent = TRUE,
+#                       time.weight.eta = 0.0005)
+# 
+#   pred <- predict(ranks, date = unique_dates[i+170],
+#                   silent = TRUE)
+#   
+# 
+#   phs <- c(phs, pred$scores$pred.home.score) # predicted home score
+#   pas <- c(pas, pred$scores$pred.away.score) # predicted away score
+#   pht <- c(pht, pred$scores$home.team) # home team in predictions
+#   pat <- c(pat, pred$scores$away.team) # away team in predictions
+# }
 ```
 
 ```{r}
-#Una manera más rápida de hacer lo anterior:
+  #Una manera más rápida que utilizar vectores en un ciclo en R:
 phs <- list(); pas <- list(); pht <- list(); pat <- list()
+#Véase que varias veces se tiene que calcular esta instrucción dentro del ciclo y podríamos solo calcularlo una vez y luego acceder a uno de sus elementos.
+unique_dates <- unique(scores$date)
+#Con length(unique_dates)-170) estamos haciendo 1066 iteraciones, y básicamente con cada iteración estamos creando conjuntos de entrenamiento de 170 fechas (empezando en 2010-08-28) para predecir los partidos de los siguientes días. Por ejemplo, primero se utilizan los partidos entre 2010-08-28 (unique_dates[1]) a 2012-03-04 (unique_dates[170]) para predecir los partidos del día 2012-03-05 (unique_dates[170+1]).
 for(i in 1:(length(unique(scores$date))-170)){
   ranks <- rank.teams(scores = scores, teams = teams, 
                       min.date = unique(scores$date)[i], 
@@ -234,9 +232,11 @@ for(i in 1:(length(unique(scores$date))-170)){
                       silent = TRUE,
                       time.weight.eta = 0.0005)
   #Véase que este objeto se va modificando varias veces, por lo que al ver pred en la consola, solo veremos el último ejecutado en este ciclo y no el ajuste de todas las iteraciones.
+  
+  #Véase que al final, se predice los resultados de la última fecha: 2020-07-19.
   pred <- predict(ranks, date = unique(scores$date)[i+170],
                   silent = TRUE)
-  
+    #Ya que estamos prediciendo los partidos de 1 día, por cada iteración; phs, pas, pht y pat podrían no ser del mismo tamaño (el tamaño de cada vector es el mismo que el número de partidos por día).
   phs[[i]] <- pred$scores$pred.home.score # predicted home score
   pas[[i]] <- pred$scores$pred.away.score # predicted away score
   pht[[i]] <- pred$scores$home.team # home team in predictions
@@ -255,7 +255,7 @@ phs <- phs[buenos] # predicted home score
 pas <- pas[buenos] # predicted away score
 pht <- pht[buenos] # home team in predictions
 pat <- pat[buenos] # away team in predictions
-#Con lo siguiente, estamos tomando todos que se predijeron en cada uno de los ciclos anteriores (el primer bloque de fechas predice el día unique(scores$date)[171] = 2012-03-05)
+#Con lo siguiente, estamos tomando los que se predijeron en cada uno de los ciclos anteriores (el primer bloque de fechas predice el día unique(scores$date)[171] = 2012-03-05)
 momio <- data %>% filter(Date >= unique(scores$date)[171])
 momio <- momio[buenos,] #Nos quedamos donde no haya Nulos en las predicciones.
 # Estas dos medias nos "ayudan" a ver que equipos se tienen en las predicciones y los partidos reales.
@@ -299,7 +299,7 @@ cap <- 50000; g <- NULL
 
 #Es decir, se hacen tantas iteraciones como datos en phs (recordar que se tienen datos desde 2012-03-05 hasta 2020-07-19)
 for(j in 1:length(phs)){
-  #Hacemos dos apuestas sobre los juegos donde se predijeron más de 3 goles o menos de 2.1 goles. 0.64/(momio$Max.2.5.O[j]^-1) > 1 y 0.58/(momio$Max.2.5.U[j]^-1) > 1 nos ayudan a filtrar los partidos en los que las cuotas nos permitan obtener una ganancia mínima. 
+  #Hacemos dos apuestas sobre los juegos donde se predijeron más de 3 goles o menos de 2.1 goles. 
 
   #Primera apuesta:
   #Si se predijeron más de 3 goles por partido y la probabilidad de obtener más de 2.5 goles condicionado a que nuestro modelo prediga más de 3 goles se mayor que la establecida por el sitio de apuestas ((momio$Max.2.5.O[j]^-1)).
@@ -473,7 +473,7 @@ series_max_capital <- ts(g_max$Capital)
 series_ave_capital <- ts(g_ave$Capital)
 ```
 
-Podemos considerar como unidades de tiempo a cada partido en el que se ha apostado. El problema radica en que la definición de la frecuencia, ya que la estrategia de apuesta es la que determina cuando apostar.
+Podemos considerar como unidades de tiempo a cada partido en el que se ha apostado. El problema radica en la definición de la frecuencia, ya que la estrategia de apuesta es la que determina cuando apostar.
 
 ```{r}
 series_max_capital_D <- stats::decompose(series_max_capital, type = "additive")
@@ -490,7 +490,7 @@ library(patchwork)
 
 La primera gráfica indica que la serie tiene alguna tendencia y por la segunda podemos inferir que solo el valor inmediato anterior esta correlacionado con el estudiado. Esto da fuertes indicios para indicar que el comportamiento de nuestra apuesta cambiará solo por el efecto anterior, tal como una caminata aleatoria. 
 
-Podemos ver la tendencia que tiene nuestras apuestas en este momento
+Podemos ver la tendencia que tiene nuestras apuestas en este momento:
 
 ```{r}
 autoplot(series_max_capital) + labs(x = "Número de Partidos", y = "Capital") + 

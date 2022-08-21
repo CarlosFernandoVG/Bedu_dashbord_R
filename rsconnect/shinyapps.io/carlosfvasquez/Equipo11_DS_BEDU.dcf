@@ -1,0 +1,14 @@
+name: Equipo11_DS_BEDU
+title: Equipo11_DS_BEDU
+username:
+account: carlosfvasquez
+server: shinyapps.io
+hostUrl: https://api.shinyapps.io/v1
+appId: 6818198
+bundleId: 6222150
+url: https://carlosfvasquez.shinyapps.io/Equipo11_DS_BEDU/
+when: 1661063619.58121
+lastSyncTime: 1661063619.58136
+asMultiple: FALSE
+asStatic: FALSE
+ignoredFiles: .gitattributes|momios.R|notes.txt|Proyecto.Rmd|README.md|RawData
